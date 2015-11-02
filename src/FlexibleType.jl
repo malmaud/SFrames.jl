@@ -22,8 +22,8 @@ function FlexibleType(x::Union{Float32,Float64})
     FlexibleType{Float64}(icxx"flexible_type((double)$x);")
 end
 
-get(t::FlexibleType{Int}) = icxx"(long)$(t.val);"
-get(t::FlexibleType{Float64}) = icxx"(double)$(t.val);"
+get(t::FlexibleType{Int}) = icxx"(long)$(t.val);"::Int
+get(t::FlexibleType{Float64}) = icxx"(double)$(t.val);"::Float64
 
 function show{T}(io::IO, t::FlexibleType{T})
     print(io, "FlexibleType(")
