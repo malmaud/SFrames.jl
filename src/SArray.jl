@@ -4,9 +4,9 @@ using Cxx
 using Lazy
 import Base: getindex, setindex!, show, +, -, *, /, .+, .-, ./, .*, .>, .<, .==, .>=, .<=
 
-import Graphlab.FlexibleTypeMod: FlexibleType
+import SFrames.FlexibleTypeMod: FlexibleType
 
-type SArray
+immutable SArray
     val
 end
 
@@ -21,7 +21,7 @@ function SArray(x::AbstractVector{Int})
 end
 
 function getindex(x::SArray, idx::Int)
-    FlexibleType{Int}(icxx"$(x.val)[$idx-1];")
+    FlexibleType(icxx"$(x.val)[$idx-1];")
 end
 
 function getindex(s::SArray, idx::UnitRange)
@@ -39,14 +39,14 @@ end
 
 function Base.next(s::SArray, state)
     iter, enditer = state
-    (icxx"*$iter;", (icxx"$iter+1;", enditer))
+    value = icxx"auto val=*$iter; return val;" |> FlexibleType
+    (value, (icxx"$iter+1;", enditer))
 end
 
 function Base.done(s::SArray, state)
     iter, enditer = state
     icxx"$iter == $enditer;"
 end
-
 
 function Base.show(io::IO, s::SArray)
     write(io, "SArray($(Vector(s)))")
@@ -68,7 +68,7 @@ for (julia_op, c_op) in [
     (:.<=, "<=")
     ]
     cstr = "\$(s1.val) $c_op \$(s2.val);"
-    cstr_scalar = cstr = "\$(s1.val) $c_op \$s2;"
+    cstr_scalar = "\$(s1.val) $c_op \$s2;"
     for op in [julia_op, Symbol(".$julia_op")]
         @eval  function $op(s1::SArray, s2::SArray)
             SArray($(Expr(:macrocall, Symbol("@icxx_str"), cstr)))
