@@ -9,7 +9,9 @@ include("SArray.jl")
 include("SFrame.jl")
 
 import .SFrameMod: SFrame
-export SFrame
+import .SArrayMod: SArray
+import .SFlexibleTypeMod: FlexibleType
+export SFrame, SArray, FlexibleType
 
 function __init__()
     const SFRAME_PATH = get(ENV, "SFRAME_PATH",

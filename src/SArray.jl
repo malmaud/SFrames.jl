@@ -49,7 +49,10 @@ function Base.done(s::SArray, state)
 end
 
 function Base.show(io::IO, s::SArray)
-    write(io, "SArray($(Vector(s)))")
+    sstream = icxx"stringstream();"
+    icxx"$sstream<<$(s.val);"
+    c = icxx"$sstream.str().c_str();" |> bytestring
+    write(io, c)
 end
 
 Base.size(x::SArray) = (Int(icxx"$(x.val).size();"),)
@@ -149,5 +152,16 @@ end
 function Base.nnz(s::SArray)
     icxx"$(s.val).nnz();" |> Int
 end
+
+# function Base.apply(s::SArray, f, skip_undefined=true)
+#     function genf(val)
+#         f(get(val))::Int
+#     end
+#     c_f = cfunction(genf, Int, Int)
+#     icxx"$(s.val).apply($c_f, flex_type_enum::INTEGER, $skip_undefined);" |>
+#     SArray
+# end
+
+
 
 end
