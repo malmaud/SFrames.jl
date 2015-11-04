@@ -3,6 +3,21 @@ module SFrames
 using Cxx
 using Lazy
 
+"""
+`head(s::T, n) -> T`
+
+Returns the first `n` elements of `s`.
+
+`s` can be either an `SFrame` or an `SArray`.
+"""
+function head end
+function tail end
+function materialize end
+function ismaterialized end
+function sample end
+function dropna end
+function unpack end
+
 include("Util.jl")
 include("FlexibleType.jl")
 include("SArray.jl")
@@ -10,8 +25,9 @@ include("SFrame.jl")
 
 import .SFrameMod: SFrame
 import .SArrayMod: SArray
-import .SFlexibleTypeMod: FlexibleType
+import .FlexibleTypeMod: FlexibleType
 export SFrame, SArray, FlexibleType
+
 
 function __init__()
     const SFRAME_PATH = get(ENV, "SFRAME_PATH",
@@ -45,6 +61,7 @@ function __init__()
     using namespace std;
     """
 end
+
 
 
 end # module

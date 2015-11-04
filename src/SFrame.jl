@@ -5,6 +5,7 @@ import Base: show
 import SFrames.FlexibleTypeMod: FlexibleType
 import SFrames.SArrayMod: SArray
 import SFrames.Util: cstrings, cstring, cstring_map, cstring_vector
+import SFrames: head, tail, materialize, ismaterialized, sample, dropna
 
 immutable SFrame
   val
@@ -13,6 +14,18 @@ end
 SFrame() = SFrame(icxx"gl_sframe();")
 
 SFrame(x::SFrame) = SFrame(x.val)
+
+function SFrame(d::Associative)
+    s = SFrame()
+    for (col, values) in d
+        s[col] = values
+    end
+    s
+end
+
+function SFrame(dir::AbstractString)
+    load(dir)
+end
 
 function Base.copy(x::SFrame)
     SFrame(icxx"gl_sframe($(x.val));")
@@ -73,7 +86,13 @@ hassize(s::SFrame) = icxx"$(s.val).has_size();"
 materialize(s::SFrame) = icxx"$(s.val).materialize();"
 
 function save(s::SFrame, path, format="")
-    icxx"$(s.val).save($(cstring(path)), $(cstring(format)))"
+    icxx"$(s.val).save($(cstring(path)), $(cstring(format)));"
+end
+
+function load(dir)
+    s = SFrame()
+    icxx"$(s.val).construct_from_sframe_index($(cstring(dir)));"
+    s
 end
 
 head(s::SFrame, n) = icxx"$(s.val).head($n);" |> SFrame
@@ -171,5 +190,39 @@ function Base.show(io::IO, s::SFrame)
     write(io, c)
 end
 
+function pack_columns(s::SFrame, column_prefix, new_column_name, dtype)
+    icxx"$(s.val).pack_columns(
+        $(cstring(column_prefix)), $(cstring(new_column_name)),
+        flex_type_enum::DICT);" |> SFrame
+end
+
+function unpack(s::SFrame, unpack_column, column_name_prefix="X")
+    icxx"$(s.val).unpack($(cstring(unpack_column)), $(cstring(column_name_prefix)));" |>
+    SFrame
+end
+
+function unpack(s::SArray, column_name_prefix="X")
+    icxx"$(s.val).unpack($(cstring(column_name_prefix)));" |> SFrame
+end
+
+function read_csv(csv_file)
+    s = SFrame()
+    csv_config = icxx"csv_parsing_config_map();"
+    column_type_hints = icxx"str_flex_type_map();"
+    icxx"$(s.val).construct_from_csvs($(cstring(csv_file)), $csv_config, $column_type_hints);";
+    s
+end
+
+function column_names(s::SFrame)
+    cnames = icxx"$(s.val).column_names();"
+    jlnames = UTF8String[]
+    b = icxx"$cnames.begin();"
+    e = icxx"$cnames.end();"
+    while icxx"$b!=$e;"
+        push!(jlnames, icxx"(*$b).c_str();" |> bytestring)
+        b = icxx"$b+1;"
+    end
+    jlnames
+end
 
 end

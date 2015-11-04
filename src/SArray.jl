@@ -4,7 +4,8 @@ using Cxx
 using Lazy
 import Base: getindex, setindex!, show, +, -, *, /, .+, .-, ./, .*, .>, .<, .==, .>=, .<=
 
-import SFrames.FlexibleTypeMod: FlexibleType
+import SFrames.FlexibleTypeMod: FlexibleType, FlexibleTypeStruct, FlexibleTypeInt
+import SFrames: head, tail, materialize, ismaterialized, sample, dropna
 
 immutable SArray
     val
@@ -133,6 +134,13 @@ function clip(s::SArray, lower, upper)
     icxx"$(s.val).clip($lower, $upper);" |> SArray
 end
 
+clip_lower(s::SArray, threshold) =
+    icxx"$(s.val).clip_lower($threshold);" |> SArray
+
+
+clip_upper(s::SArray, threshold) =
+    icxx"$(s.val).clip_upper($threshold);" |> SArray
+
 function dropna(s::SArray)
     icxx"$(s.val).dropna();" |> SArray
 end
@@ -153,15 +161,30 @@ function Base.nnz(s::SArray)
     icxx"$(s.val).nnz();" |> Int
 end
 
-# function Base.apply(s::SArray, f, skip_undefined=true)
-#     function genf(val)
-#         f(get(val))::Int
-#     end
-#     c_f = cfunction(genf, Int, Int)
-#     icxx"$(s.val).apply($c_f, flex_type_enum::INTEGER, $skip_undefined);" |>
-#     SArray
-# end
+function Base.apply(s::SArray, f, skip_undefined=true)
+    f_ptr = cfunction(f, Int, (Int,))
+    res = icxx"$(s.val).apply((long (*)(long))$(f_ptr), flex_type_enum::INTEGER);"
+    SArray(res)
+end
 
+Base.map(f, s::SArray) = apply(s, f)
 
+Base.maximum(s::SArray) = icxx"$(s.val).max();" |> FlexibleType
+Base.minimum(s::SArray) = icxx"$(s.val).min();" |> FlexibleType
+Base.mean(s::SArray) = icxx"$(s.val).mean();" |> FlexibleType
+Base.std(s::SArray) = icxx"$(s.val).std();" |> FlexibleType
+Base.endof(s::SArray) = length(s)
+
+dict_keys(s::SArray) = icxx"$(s.val).dict_keys();" |> SArray
+dict_values(s::SArray) = icxx"$(s.val).dict_values();" |> SArray
+
+function count_ngrams(s::SArray, n=2, method="word", to_lower=true, ignore_space=true)
+    icxx"$(s.val).count_ngrams($n, $(cstring(method)), $to_lower, $ignore_space);" |>
+    SArray
+end
+
+function count_words(s::SArray, to_lower=true)
+    icxx"$(s.val).count_words($to_lower);" |> SArray
+end
 
 end

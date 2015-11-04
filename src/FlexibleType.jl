@@ -10,6 +10,18 @@ using Cxx
 import Cxx: CppValue
 import Base: show, get, +, -, /, *, >, >=, ==, <, <=
 
+immutable FlexibleTypeStruct
+    data::NTuple{8,UInt8}
+    typ::UInt8
+end
+
+immutable FlexibleTypeInt
+    data::Int
+    typ::UInt8
+
+    FlexibleTypeInt(x) = new(x, Int(INTEGER))
+end
+
 immutable FlexibleType
     val
 end
