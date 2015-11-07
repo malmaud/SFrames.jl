@@ -23,10 +23,10 @@ include("FlexibleType.jl")
 include("SArray.jl")
 include("SFrame.jl")
 
-import .SFrameMod: SFrame
-import .SArrayMod: SArray
-import .FlexibleTypeMod: FlexibleType
-export SFrame, SArray, FlexibleType
+# import .SFrameMod: SFrame
+# import .SArrayMod: SArray
+# import .FlexibleTypeMod: FlexibleType
+# export SFrame, SArray, FlexibleType
 
 
 function __init__()

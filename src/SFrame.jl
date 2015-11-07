@@ -8,12 +8,17 @@ import SFrames.Util: cstrings, cstring, cstring_map, cstring_vector
 import SFrames: head, tail, materialize, ismaterialized, sample, dropna
 
 immutable SFrame
-  val
+    val
 end
 
-SFrame() = SFrame(icxx"gl_sframe();")
+function SFrame(;kwargs...)
+    s = SFrame(icxx"gl_sframe();")
+    for (col, values) in kwargs
+        s[col] = values
+    end
+    s
+end
 
-SFrame(x::SFrame) = SFrame(x.val)
 
 function SFrame(d::Associative)
     s = SFrame()
@@ -53,6 +58,8 @@ end
 function Base.getindex(s::SFrame, idx::Integer)
     icxx"$(s.val)[$(Cint(idx-1))];" |> jlvector
 end
+
+Base.eltype(::SFrame) = Vector{FlexibleType}
 
 function Base.start(s::SFrame)
     ra = icxx"$(s.val).range_iterator();"
@@ -105,7 +112,7 @@ function topk(s::SFrame, column_name, k=10, reverse=false)
     icxx"$(s.val).topk($(cstring(column_name)), $k, $reverse)" |> SFrame
 end
 
-function Base.setindex!(s::SFrame, column::SArray, name::ByteString)
+function Base.setindex!(s::SFrame, column::SArray, name)
     icxx"$(s.val).replace_add_column($(column.val), $(cstring(name)));"
     column
 end
@@ -224,5 +231,6 @@ function column_names(s::SFrame)
     end
     jlnames
 end
+
 
 end

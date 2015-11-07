@@ -15,6 +15,8 @@ function cstring(jlstring)
   icxx"string($(pointer(b)), $(length(b)));"
 end
 
+cstring(jlstring::Symbol) = cstring(string(jlstring))
+
 
 function cstring_map(jlmap)
   m = icxx"map<string, string>();"
