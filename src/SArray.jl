@@ -7,6 +7,7 @@ import Base: getindex, setindex!, show, +, -, *, /, .+, .-, ./, .*, .>, .<, .==,
 import SFrames: FlexibleTypeMod
 import SFrames.FlexibleTypeMod: FlexibleType
 import SFrames: head, tail, materialize, ismaterialized, sample, dropna
+import SFrames.Util: cstring
 
 abstract SAbstractArray
 
@@ -43,9 +44,22 @@ function SArray{T<:Union{Int,Float64}}(x::AbstractVector{T})
     SArray(array)
 end
 
+function SArray{T<:AbstractString}(x::AbstractVector{T})
+    writer = icxx"return new gl_sarray_writer(flex_type_enum::STRING, 1);"
+    for _ in x
+        icxx"$writer->write($(cstring(_)), 0);"
+    end
+    array = icxx"$writer->close();"
+    icxx"delete $writer;"
+    SArray(array)
+end
 
 function getindex{T<:Union{Int, Float64}}(s::SArray, ::Type{T})
     SArrayTyped{T}(s)
+end
+
+function getindex{T<:Union{ASCIIString, UTF8String, AbstractString}}(s::SArray, ::Type{T})
+    SArrayTyped{UTF8String}(s)
 end
 
 function getindex(x::SArray, idx::Int)

@@ -15,71 +15,61 @@ const IMAGE = FlexType(8)
 using Cxx
 import Cxx: CppValue
 import Base: show, get, +, -, /, *, >, >=, ==, <, <=
-import SFrames.Util: cstring
+import SFrames.Util: cstring, jlstring
 
 immutable FlexibleType
-    data::Int64
-    buf::NTuple{4,UInt8}
-    typ::FlexType
-    buf2::NTuple{3,UInt8}
-end
-
-function FlexibleType(data, typ)
-    FlexibleType(data, (0x00, 0x00, 0x00, 0x00), typ, (0x00, 0x00, 0x00))
+    val
 end
 
 function FlexibleType(x::Int)
-    FlexibleType(x, INTEGER)
+    FlexibleType(icxx"return flexible_type((long)$x);")
 end
 
 function FlexibleType(x::AbstractString)
-    f = icxx"flexible_type();"
-    icxx"$f = $(cstring(x));"
-    f |> FlexibleType
+    FlexibleType(icxx"return flexible_type($(cstring(x)));")
 end
-
-function FlexibleType(c_flex_type::Cxx.CppValue)
-    bytes = c_flex_type.data
-    # todo make efficient
-    pointer_from_objref(bytes) |> Ptr{FlexibleType} |> unsafe_load
-end
-
 
 function FlexibleType(x::Float64)
-    FlexibleType(reinterpret(Int,x), FLOAT)
+    FlexibleType(icxx"return flexible_type((double)$x);")
 end
 
-const FLEX_NULL = FlexibleType(0, UNDEFINED)
-
 function Base.convert(::Type{Int}, f::FlexibleType)
-    f.data
+    icxx"auto x=$(f.val).get<flex_int>(); return x;"
 end
 
 function Base.convert(::Type{Float64}, f::FlexibleType)
-    reinterpret(Float64, f.data)
+    icxx"auto x=$(f.val).get<flex_float>(); return x;"
 end
 
 function Base.convert(::Type{UTF8String}, f::FlexibleType)
-    "test"
+    icxx"auto x=$(f.val).get<flex_string>().c_str(); return x;" |> bytestring |> utf8
+end
+
+function Base.convert{T<:Associative}(::Type{T}, f::FlexibleType)
+    d = icxx"$(f.val).get<flex_dict>();"
+    b = icxx"$d.begin();"
+    e = icxx"$d.end();"
+    d_jl = Dict{FlexibleType, FlexibleType}()
+    while icxx"$b != $e;"
+        val = icxx"*$b;"
+        d_jl[FlexibleType(icxx"$val.first;")] = FlexibleType(icxx"$val.second;")
+        b = icxx"$b+1;"
+    end
+    d_jl
 end
 
 function Base.get(f::FlexibleType)
-    if f.typ == INTEGER
+    typ = f.val.data[13]
+    if typ == INTEGER
         Int(f)
-    elseif f.typ == FLOAT
+    elseif typ == FLOAT
         Float64(f)
-    elseif f.typ == UNDEFINED
+    elseif typ == UNDEFINED
         nothing
-    elseif t.typ == STRING
+    elseif typ == STRING
         UTF8String(f)
     end
 end
-
-
-function FlexibleType(x::FlexibleType)
-    FlexibleType(x.data, x.typ)
-end
-
 
 function show(io::IO, t::FlexibleType)
     print(io, "FlexibleType(")
@@ -87,24 +77,29 @@ function show(io::IO, t::FlexibleType)
     print(io, ")")
 end
 
-#  todo this is just a rough sketch of defining operators on flex types
-for op in [:+, :-, :/, :*]
-    @eval function $op(f1::FlexibleType, f2::FlexibleType)
-        if f1.typ == INTEGER && f2.typ == INTEGER
-            FlexibleType($op(Int(f1), Int(f2)))
-        elseif f1.typ == UNDEFINED || f2.typ == UNDEFINED
-            FLEX_NULL
-        else
-            FlexibleType($op(Float64(f1), Float64(f2)))
-        end
-    end
-end
 
-for op in [:(==), :>, :>=, :<, :<=]
-    @eval function $op(f1::FlexibleType, f2::FlexibleType)
-        f1.typ == f2.typ || error("Invalid comparsion")
-        $op(f1.data, f2.data)
+for (julia_op, c_op) in [
+    (:+, "+"),
+    (:-, "-"),
+    (:/, "/"),
+    (:*, "*"),
+    (:>, ">"),
+    (:>=, ">="),
+    (:(==), "=="),
+    (:<, "<"),
+    (:<=, "<=")
+    ]
+    cstr = "\$(s1.val) $c_op \$(s2.val);"
+    cstr_scalar = "\$(s1.val) $c_op \$s2;"
+    @eval  function $julia_op(s1::FlexibleType, s2::FlexibleType)
+        FlexibleType($(Expr(:macrocall, Symbol("@icxx_str"), cstr)))
     end
+
+    @eval function $julia_op(s1::FlexibleType, s2::Union{Int,Float64})
+        FlexibleType($(Expr(:macrocall, Symbol("@icxx_str"), cstr_scalar)))
+    end
+
+    @eval $julia_op(s1::Union{Int,Float64}, s2::FlexibleType) = $julia_op(s2, s1)
 end
 
 macro dispatch_numeric(funcs...)
@@ -112,9 +107,10 @@ macro dispatch_numeric(funcs...)
     for func in funcs
         e = quote
             function $(esc(func))(f::FlexibleType)
-                if f.typ == INTEGER
+                typ = f.val.data[13]
+                if typ == INTEGER
                     $(esc(func))(Int(f)) |> FlexibleType
-                elseif f.typ == FLOAT
+                elseif typ == FLOAT
                     $(esc(func))(Float64(f)) |> FlexibleType
                 else
                     error("Invalid type for operation")
@@ -126,29 +122,5 @@ macro dispatch_numeric(funcs...)
     block
 end
 @dispatch_numeric Base.sin Base.cos Base.tan Base.log Base.exp Base.sqrt Base.mod Base.mod1 Base.expm1 (-)
-
-# for (julia_op, c_op) in [
-#     (:+, "+"),
-#     (:-, "-"),
-#     (:/, "/"),
-#     (:*, "*"),
-#     (:>, ">"),
-#     (:>=, ">="),
-#     (:(==), "=="),
-#     (:<, "<"),
-#     (:<=, "<=")
-#     ]
-#     cstr = "\$(s1.val) $c_op \$(s2.val);"
-#     cstr_scalar = "\$(s1.val) $c_op \$s2;"
-#     @eval  function $julia_op(s1::FlexibleType, s2::FlexibleType)
-#         FlexibleType($(Expr(:macrocall, Symbol("@icxx_str"), cstr)))
-#     end
-#
-#     @eval function $julia_op(s1::FlexibleType, s2::Int)
-#         FlexibleType($(Expr(:macrocall, Symbol("@icxx_str"), cstr_scalar)))
-#     end
-#
-#     @eval $julia_op(s1::Int, s2::FlexibleType) = $julia_op(s2, s1)
-# end
 
 end

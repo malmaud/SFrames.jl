@@ -21,12 +21,12 @@ function unpack end
 include("Util.jl")
 include("FlexibleType.jl")
 include("SArray.jl")
-include("SFrame.jl")
+# include("SFrame.jl")
 
 # import .SFrameMod: SFrame
-# import .SArrayMod: SArray
-# import .FlexibleTypeMod: FlexibleType
-# export SFrame, SArray, FlexibleType
+import .SArrayMod: SArray
+import .FlexibleTypeMod: FlexibleType
+export SArray, FlexibleType
 
 
 function __init__()
@@ -56,6 +56,7 @@ function __init__()
     #include <string>
     #include <vector>
     #include <map>
+    #include <utility>
 
     using namespace graphlab;
     using namespace std;
