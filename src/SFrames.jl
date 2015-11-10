@@ -1,9 +1,8 @@
 module SFrames
 
-export head, tail, materialize, ismaterialized, sample, dropna, unpack, save, load, SArray, SArrayTyped, nummissing, clip, clip_lower, clip_upper, fillna, count_ngrams, count_words, FlexibleType, SFrame, column_names, read_csv, unpack, pack_columns, stack, unstack, addrownumber, topk
+export head, tail, materialize, ismaterialized, sample, dropna, unpack, save, load, SArray, SArrayTyped, nummissing, clip, clip_lower, clip_upper, fillna, count_ngrams, count_words, FlexibleType, SFrame, column_names, read_csv, unpack, pack_columns, stack, unstack, addrownumber, topk, Agg, groupby
 
 using Cxx
-using Lazy
 
 """
 `head(s::T, n) -> T`
@@ -26,6 +25,7 @@ include("Util.jl")
 include("FlexibleType.jl")
 include("SArray.jl")
 include("SFrame.jl")
+include("Agg.jl")
 
 # import .SFrameMod: SFrame
 # import .SArrayMod: SArray

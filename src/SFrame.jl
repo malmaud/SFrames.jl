@@ -1,6 +1,6 @@
 module SFrameMod
 
-export SFrame, column_names, read_csv, pack_columns, stack, unstack, addrownumber, topk
+export SFrame, column_names, read_csv, pack_columns, stack, unstack, addrownumber, topk, groupby
 
 using Cxx
 import Base: show
@@ -258,5 +258,16 @@ function column_names(s::SFrame)
     jlnames
 end
 
+function groupby(s::SFrame, groupkeys, operators)
+    c_keys = icxx"vector<string>();"
+    c_ops = icxx"map<string, aggregate::groupby_descriptor_type>();"
+    for key in groupkeys
+        icxx"$c_keys.push_back($(cstring(key)));"
+    end
+    for (col, op) in operators
+        icxx"$c_ops[$(cstring(col))] = $op;"
+    end
+    icxx"$(s.val).groupby($c_keys, $c_ops);" |> SFrame
+end
 
 end
