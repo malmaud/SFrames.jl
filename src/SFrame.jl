@@ -1,11 +1,27 @@
 module SFrameMod
 
+export SFrame, column_names, read_csv, pack_columns, stack, unstack, addrownumber, topk
+
 using Cxx
 import Base: show
-import SFrames.FlexibleTypeMod: FlexibleType
-import SFrames.SArrayMod: SArray
+import SFrames.FlexibleTypeMod: FlexibleType, FlexType
+import SFrames.SArrayMod: SArray, SAbstractArray, cval
+import SFrames: Util
 import SFrames.Util: cstrings, cstring, cstring_map, cstring_vector
-import SFrames: head, tail, materialize, ismaterialized, sample, dropna
+import SFrames: head, tail, materialize, ismaterialized, sample, dropna, save, load, unpack
+
+
+function jlvector(cvector)
+    x = FlexibleType[]
+    iter = icxx"$cvector.begin();"
+    e = icxx"$cvector.end();"
+    while icxx"$iter != $e;"
+        val = icxx"auto x=*$iter; x;"
+        push!(x, FlexibleType(val))
+        iter = icxx"$iter + 1;"
+    end
+    x
+end
 
 immutable SFrame
     val
@@ -43,17 +59,6 @@ end
 Base.getindex(s::SFrame, f::AbstractVector{Bool}) =
     s[SArray(f)]
 
-function jlvector(cvector)
-    x = FlexibleType[]
-    iter = icxx"$cvector.begin();"
-    e = icxx"$cvector.end();"
-    while icxx"$iter != $e;"
-        val = icxx"auto x=*$iter; x;"
-        push!(x, FlexibleType(val))
-        iter = icxx"$iter + 1;"
-    end
-    x
-end
 
 function Base.getindex(s::SFrame, idx::Integer)
     icxx"$(s.val)[$(Cint(idx-1))];" |> jlvector
@@ -109,11 +114,11 @@ sample(s::SFrame, fraction, seed) =
     icxx"$(s.val).sample($fraction, $seed);" |> SFrame
 
 function topk(s::SFrame, column_name, k=10, reverse=false)
-    icxx"$(s.val).topk($(cstring(column_name)), $k, $reverse)" |> SFrame
+    icxx"$(s.val).topk($(cstring(column_name)), $k, $reverse);" |> SFrame
 end
 
-function Base.setindex!(s::SFrame, column::SArray, name)
-    icxx"$(s.val).replace_add_column($(column.val), $(cstring(name)));"
+function Base.setindex!(s::SFrame, column::SAbstractArray, name)
+    icxx"$(s.val).replace_add_column($(cval(column)), $(cstring(name)));"
     column
 end
 
@@ -155,7 +160,8 @@ function fillna(s::SFrame, column, value)
     icxx"$(s.val).fillna($(cstring(column)), $value);" |> SFrame
 end
 
-function addrownumber(s::SFrame, column_name="id", start=1)
+function addrownumber(s::SFrame, column_name="id", start=0)
+    #  todo get start=1 working
     icxx"$(s.val).add_row_number($(cstring(column_name)), $(Csize_t(start)));" |> SFrame
 end
 
@@ -212,11 +218,31 @@ function unpack(s::SArray, column_name_prefix="X")
     icxx"$(s.val).unpack($(cstring(column_name_prefix)));" |> SFrame
 end
 
-function read_csv(csv_file)
+function read_csv(csv_file; use_header=true, row_limit=-1, skip_rows=-1, delimiter=",", na_values=UTF8String[], comment_char="#", escape_char="\\", quote_char="", skip_initial_space=true, column_types=Dict{UTF8String,FlexType}())
     s = SFrame()
-    csv_config = icxx"csv_parsing_config_map();"
-    column_type_hints = icxx"str_flex_type_map();"
-    icxx"$(s.val).construct_from_csvs($(cstring(csv_file)), $csv_config, $column_type_hints);";
+    opts = Dict{UTF8String, FlexibleType}()
+    opts["use_header"] = FlexibleType(use_header ? 1 : 0)
+    if row_limit ≥ 0
+        opts["row_limit"] = FlexibleType(row_limit)
+    end
+    if skip_rows ≥ 0
+        opts["skip_rows"] = FlexibleType(skip_rows)
+    end
+    opts["delimiter"] = FlexibleType(delimiter)
+    opts["comment_char"] = FlexibleType(comment_char)
+    opts["escape_char"] = FlexibleType(escape_char)
+    opts["quote_char"] = FlexibleType(quote_char)
+    opts["na_values"] = FlexibleType(na_values)
+    opts["skip_initial_space"] = FlexibleType(skip_initial_space ? 1 : 0)
+    opts_c = icxx"map<string, flexible_type>();"
+    for (k, v) in opts
+        icxx"$opts_c[$(cstring(k))] = $(v.val);"
+    end
+    c_column_types = icxx"map<string, flex_type_enum>();"
+    for (k, v) in column_types
+        icxx"$c_column_types[$(cstring(k))] = flex_type_enum($v);"
+    end
+    icxx"$(s.val).construct_from_csvs($(cstring(csv_file)), $opts_c, $c_column_types);";
     s
 end
 

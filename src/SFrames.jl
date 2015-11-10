@@ -1,5 +1,7 @@
 module SFrames
 
+export head, tail, materialize, ismaterialized, sample, dropna, unpack, save, load, SArray, SArrayTyped, nummissing, clip, clip_lower, clip_upper, fillna, count_ngrams, count_words, FlexibleType, SFrame, column_names, read_csv, unpack, pack_columns, stack, unstack, addrownumber, topk
+
 using Cxx
 using Lazy
 
@@ -17,15 +19,23 @@ function ismaterialized end
 function sample end
 function dropna end
 function unpack end
+function save end
+function load end
 
 include("Util.jl")
 include("FlexibleType.jl")
 include("SArray.jl")
-# include("SFrame.jl")
+include("SFrame.jl")
 
 # import .SFrameMod: SFrame
-import .SArrayMod: SArray
-import .FlexibleTypeMod: FlexibleType
+# import .SArrayMod: SArray
+# import .FlexibleTypeMod: FlexibleType
+
+using .FlexibleTypeMod
+using .SArrayMod
+using .SFrameMod
+
+
 export SArray, FlexibleType
 
 

@@ -1,12 +1,14 @@
 module SArrayMod
 
+export SArray, SArrayTyped, nummissing, clip, clip_lower, clip_upper, fillna, count_ngrams, count_words
+
 using Cxx
 using Lazy
 import Base: getindex, setindex!, show, +, -, *, /, .+, .-, ./, .*, .>, .<, .==, .>=, .<=
 
 import SFrames: FlexibleTypeMod
 import SFrames.FlexibleTypeMod: FlexibleType
-import SFrames: head, tail, materialize, ismaterialized, sample, dropna
+import SFrames: head, tail, materialize, ismaterialized, sample, dropna, save, load, unpack
 import SFrames.Util: cstring
 
 abstract SAbstractArray
@@ -54,7 +56,17 @@ function SArray{T<:AbstractString}(x::AbstractVector{T})
     SArray(array)
 end
 
-function getindex{T<:Union{Int, Float64}}(s::SArray, ::Type{T})
+function SArray{T<:Associative}(x::AbstractVector{T})
+    writer = icxx"return new gl_sarray_writer(flex_type_enum::DICT, 1);"
+    for _ in x
+        icxx"$writer->write($(FlexibleType(_).val), 0);"
+    end
+    array = icxx"$writer->close();"
+    icxx"delete $writer;"
+    SArray(array)
+end
+
+function getindex{T}(s::SArray, ::Type{T})
     SArrayTyped{T}(s)
 end
 
@@ -228,7 +240,7 @@ function Base.apply(s::SArrayTyped{Float64}, f, skip_undefined=true)
     SArrayTyped{Float64}(res)
 end
 
-Base.map(f, s::SAbstractArray) = apply(s, f)
+# Base.map(f, s::SAbstractArray) = apply(s, f)
 
 Base.maximum(s::SArray) = icxx"$(cval(s)).max();" |> FlexibleType
 Base.minimum(s::SArray) = icxx"$(cval(s)).min();" |> FlexibleType
