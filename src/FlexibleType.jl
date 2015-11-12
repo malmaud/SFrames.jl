@@ -1,8 +1,10 @@
 module FlexibleTypeMod
 
 export FlexibleType, FlexType
+using Cxx
 
 typealias FlexType UInt8
+typealias Cflexible_type Cxx.CppValue{Cxx.CxxQualType{Cxx.CppBaseType{symbol("graphlab::flexible_type")},(false,false,false)},16}
 
 const INTEGER = FlexType(0)
 const FLOAT = FlexType(1)
@@ -14,13 +16,13 @@ const DATETIME = FlexType(6)
 const UNDEFINED = FlexType(7)
 const IMAGE = FlexType(8)
 
-using Cxx
+
 import Cxx: CppValue
 import Base: show, get, +, -, /, *, >, >=, ==, <, <=
 import SFrames.Util: cstring, jlstring
 
 immutable FlexibleType
-    val::Cxx.CppValue{Cxx.CxxQualType{Cxx.CppBaseType{symbol("graphlab::flexible_type")},(false,false,false)},16}
+    val::Cflexible_type
 end
 
 Base.hash(f::FlexibleType) = hash(f.val.data)
@@ -130,7 +132,7 @@ function Base.get(f::FlexibleType)
 end
 
 function show(io::IO, t::FlexibleType)
-    print(io, "FlexibleType(")
+    print(io, "Flex(")
     show(io, get(t))
     print(io, ")")
 end

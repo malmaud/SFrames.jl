@@ -44,7 +44,7 @@ function __init__()
         joinpath(homedir(), "SFrame"))
     println("Assuming SFrame is in $SFRAME_PATH")
     Libdl.dlopen(
-        joinpath(SFRAME_PATH, "debug/oss_src/unity/libunity_shared.so"), Libdl.RTLD_GLOBAL)
+        joinpath(SFRAME_PATH, "debug/oss_src/unity/libunity_shared.dylib"), Libdl.RTLD_GLOBAL)
 
     map(path->addHeaderDir(joinpath(SFRAME_PATH,path), kind=C_System), [
         "oss_src",

@@ -29,4 +29,18 @@ function QUANTILE(col, quantiles::AbstractVector)
     icxx"aggregate::QUANTILE($(cstring(col)), $c);"
 end
 
+# type ParityAgg
+#     parity::Int
+#     sum::Int
+# end
+#
+# emit(p::ParityAgg ) = p.parity
+# function add_element_simple(p::ParityAgg, elem)
+#     p.sum = p.sum + Int(elem)
+# end
+#
+# function partial_finalize(p::ParityAgg)
+#     p.parity = p.sum%2
+# end
+
 end

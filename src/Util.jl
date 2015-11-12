@@ -38,6 +38,16 @@ function jlstring(cstr)
     icxx"$cstr.data();" |> bytestring
 end
 
+function jl_vector(cvec, T)
+    b = icxx"$cvec->begin();"
+    e = icxx"$cvec->end();"
+    x = T[]
+    while icxx"$b != $e"
+        push!(x, T(icxx"auto q=*$b; return q;"))
+        b = icxx"$b+1;"
+    end
+    x
+end
 
 
 end

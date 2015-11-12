@@ -4,10 +4,10 @@ export SFrame, column_names, read_csv, pack_columns, stack, unstack, addrownumbe
 
 using Cxx
 import Base: show
-import SFrames.FlexibleTypeMod: FlexibleType, FlexType
+import SFrames.FlexibleTypeMod: FlexibleType, FlexType, Cflexible_type
 import SFrames.SArrayMod: SArray, SAbstractArray, cval
 import SFrames: Util
-import SFrames.Util: cstrings, cstring, cstring_map, cstring_vector
+import SFrames.Util: cstrings, cstring, cstring_map, cstring_vector, jl_vector
 import SFrames: head, tail, materialize, ismaterialized, sample, dropna, save, load, unpack
 
 
@@ -198,9 +198,10 @@ end
 
 function Base.show(io::IO, s::SFrame)
     sstream = icxx"stringstream();"
-    icxx"$sstream<<$(s.val);"
-    c = icxx"$sstream.str().c_str();" |> bytestring
-    write(io, c)
+    icxx"$sstream<<$(s.val)<<endl;"
+    c_str = icxx"$sstream.str();"
+    ptr = icxx"$c_str.c_str();"
+    write(io, bytestring(ptr))
 end
 
 function pack_columns(s::SFrame, column_prefix, new_column_name, dtype)
@@ -269,5 +270,30 @@ function groupby(s::SFrame, groupkeys, operators)
     end
     icxx"$(s.val).groupby($c_keys, $c_ops);" |> SFrame
 end
+
+groupby(s::SFrame, groupkey::AbstractString, operators::Associative) =
+    groupby(s, [groupkey], operators)
+
+groupby(s::SFrame, groupkeys, operator::Cxx.CppValue) =
+    groupby(s, groupkeys, Dict("value"=>operator))
+
+
+# todo
+function generic_apply(f_ptr)
+    f = icxx"(vector<flexible_type>*)$f_ptr);"
+    f_jl = jl_vector(f, FlexibleType)
+    r = (global_f::Function)(f_jl)
+    return r.val::Cflexible_type
+end
+
+generic_apply_ptr = cfunction(generic_apply, Cflexible_type, (Ptr{Void},))
+
+# Doesn't work yet
+function Base.apply(s::SFrame, f)
+    global global_f = f
+    icxx"return $(s.val).apply(
+        (flexible_type (*)(const vector<flexible_type>&))$generic_apply_ptr, flex_type_enum::INTEGER);" |> SArray
+end
+
 
 end

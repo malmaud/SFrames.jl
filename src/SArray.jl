@@ -7,7 +7,7 @@ using Lazy
 import Base: getindex, setindex!, show, +, -, *, /, .+, .-, ./, .*, .>, .<, .==, .>=, .<=
 
 import SFrames: FlexibleTypeMod
-import SFrames.FlexibleTypeMod: FlexibleType
+import SFrames.FlexibleTypeMod: FlexibleType, Cflexible_type
 import SFrames: head, tail, materialize, ismaterialized, sample, dropna, save, load, unpack
 import SFrames.Util: cstring
 
@@ -228,15 +228,31 @@ function Base.nnz(s::SAbstractArray)
     icxx"$(cval(s)).nnz();" |> Int
 end
 
+function generic_apply_int(f)
+    x = Int(FlexibleType(f))
+    r = (global_f::Function)(x)
+    icxx"return flexible_type($r);"::Cflexible_type
+end
+
+const generic_apply_int_ptr = cfunction(generic_apply_int, Cflexible_type, (Cflexible_type,))
+
+function generic_apply_float(f)
+    x = Float64(FlexibleType(f))
+    r = (global_f::Function)(x)
+    icxx"return flexible_type($r);"::Cflexible_type
+end
+
+const generic_apply_float_ptr = cfunction(generic_apply_float, Cflexible_type, (Cflexible_type,))
+
 function Base.apply(s::SArrayTyped{Int}, f, skip_undefined=true)
-    f_ptr = cfunction(f, Int, (Int,))
-    res = icxx"$(cval(s)).apply((long (*)(long))$(f_ptr), flex_type_enum::INTEGER);"
+    global global_f = f
+    res = icxx"$(cval(s)).apply((long (*)(long))$(generic_apply_int_ptr), flex_type_enum::INTEGER);"
     SArrayTyped{Int}(res)
 end
 
 function Base.apply(s::SArrayTyped{Float64}, f, skip_undefined=true)
-    f_ptr = cfunction(f, Float64, (Float64,))
-    res = icxx"$(cval(s)).apply((double (*)(double))$(f_ptr), flex_type_enum::FLOAT);"
+    global global_f = f
+    res = icxx"$(cval(s)).apply((double (*)(double))$(generic_apply_float_ptr), flex_type_enum::FLOAT);"
     SArrayTyped{Float64}(res)
 end
 
@@ -247,8 +263,8 @@ Base.minimum(s::SArray) = icxx"$(cval(s)).min();" |> FlexibleType
 Base.mean(s::SArray) = icxx"$(cval(s)).mean();" |> FlexibleType
 Base.std(s::SArray) = icxx"$(cval(s)).std();" |> FlexibleType
 
-Base.maximum(s::SArrayTyped) = icxx"$(cval(s)).max();" |> FlexibleType |> Float64
-Base.minimum(s::SArrayTyped) = icxx"$(cval(s)).min();" |> FlexibleType |> Float64
+Base.maximum(s::SArrayTyped) = icxx"$(cval(s)).max();" |> FlexibleType |> eltype(s)
+Base.minimum(s::SArrayTyped) = icxx"$(cval(s)).min();" |> FlexibleType |> eltype(s)
 Base.mean(s::SArrayTyped) = icxx"$(cval(s)).mean();" |> FlexibleType |> Float64
 Base.std(s::SArrayTyped) = icxx"$(cval(s)).std();" |> FlexibleType |> Float64
 
@@ -266,5 +282,8 @@ function count_words(s::SArray, to_lower=true)
     icxx"$(s.val).count_words($to_lower);" |> SArray
 end
 
+function Base.get(s::SArray)
+    map(get, s)
+end
 
 end
