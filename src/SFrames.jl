@@ -40,7 +40,7 @@ export SArray, FlexibleType
 
 
 function __init__()
-    const SFRAME_PATH = get(ENV, "SFRAME_PATH",
+    SFRAME_PATH = get(ENV, "SFRAME_PATH",
         joinpath(homedir(), "SFrame"))
     println("Assuming SFrame is in $SFRAME_PATH")
     Libdl.dlopen(
